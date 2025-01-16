@@ -1,27 +1,27 @@
-import { MongoClient } from "mongodb";
+import { Collection, MongoClient } from "mongodb";
 import { DB_DATABASE, DB_HOST, DB_PORT } from "../config";
 
 class DBClient {
-    client: MongoClient
     connected: boolean
+    userCollection: Collection
+    fileCollection: Collection
 
     constructor() {
         this.connected = false;
+        this.userCollection = {} as Collection;
+        this.fileCollection = {} as Collection;
 
-        this.client = new MongoClient(`mongodb://${DB_HOST}:${DB_PORT}`)
-
-        this.initialised()
-    }
-
-    async initialised() {
-        try {
-            await this.client.connect()
-            this.connected = true
-            console.log("Database server connected succesfully")
-        } catch (error) {
-            this.connected = false
-            console.log("Database server connection Failed:", error)
-        }
+        MongoClient.connect(`mongodb://${DB_HOST}:${DB_PORT}`)
+            .then((client) => {
+                this.connected = true;
+                this.userCollection = client.db(DB_DATABASE).collection('users');
+                this.fileCollection = client.db(DB_DATABASE).collection('files');
+                console.log("Connected to database server successfully")
+            })
+            .catch((error) => {
+                this.connected = false;
+                console.log("Connected to database server failed:", error);
+            });
     }
 
     isAlive(): boolean {
@@ -29,14 +29,12 @@ class DBClient {
     }
 
     async nbUsers(): Promise<number> {
-        const userCollection = this.client.db(DB_DATABASE).collection('users')
-        const numberOfUsers = await userCollection.countDocuments()
+        const numberOfUsers = await this.userCollection.countDocuments()
         return numberOfUsers
     }
 
     async nbFiles(): Promise<number> {
-        const fileCollection = this.client.db(DB_DATABASE).collection('files')
-        const numberOfFiles = await fileCollection.countDocuments()
+        const numberOfFiles = await this.fileCollection.countDocuments()
         return numberOfFiles
     }
 }
