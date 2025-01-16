@@ -1,0 +1,23 @@
+version: "3.5"
+services:
+  mongo:
+    image: mongo:4.4.8
+    container_name: file_manager
+    ports:
+      - "27017:27017"
+    restart: always
+    volumes:
+      - mongo_data:/data/db
+
+  redis:
+    image: redis/redis-stack-server:latest
+    container_name: file_redis
+    ports:
+      - "6379:6379"
+    restart: always
+    volumes:
+      - redis_data:/data
+
+volumes:
+  mongo_data:
+  redis_data:
