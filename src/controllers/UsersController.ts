@@ -2,6 +2,8 @@ import { Request, Response } from "express";
 import dbClient from "../utils/db";
 import bcrypt from 'bcryptjs'
 import { User } from "../utils/types";
+import redisClient from "../utils/redis";
+import { ObjectId } from "mongodb";
 
 class UsersController {
     static async postNew(req: Request, res: Response): Promise<void> {
@@ -32,7 +34,24 @@ class UsersController {
     }
 
     static async getMe(req: Request, res: Response): Promise<void> {
-
+        try {
+            const token = req.headers["x-token"]
+            const key = `auth_${token}`
+            const userId = await redisClient.get(key)
+            if (!userId) {
+                res.status(401).json({ error: "Unauthorised" })
+                return
+            }
+            const user = await dbClient.userCollection.findOne({ _id: new ObjectId(userId)})
+            if (!user) {
+                res.status(401).json({ error: "Unauthorised" })
+                return
+            }
+            res.status(200).json({ id: user._id, email: user.email})
+            return
+        } catch (error) {
+            res.status(500).json({ "Error retrieving user": error })
+        }
     }
 }
 

@@ -36,6 +36,21 @@ class AuthController {
     }
 
     static async getDisconnect(req: Request, res: Response): Promise<void> {
+        try {
+            const token = req.headers["x-token"]
+            const key = `auth_${token}`
+            const userId = await redisClient.get(key)
+
+            if (!userId) {
+                res.status(401).json({ error: "Unauthorised" })
+                return
+            }
+            await redisClient.del(key)
+            res.status(204)
+            return
+        } catch (error) {
+            res.status(500).json({ "Error retrieving user": error })
+        }
 
     }
 }
