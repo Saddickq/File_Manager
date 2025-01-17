@@ -21,7 +21,7 @@ class UsersController {
         }
         const hashPassword = await bcrypt.hash(password, 10)
 
-        const user: User = {email: email, password: hashPassword}
+        const user: User = { email: email, password: hashPassword }
         try {
             const result = await dbClient.userCollection.insertOne(user);
             res.status(201).json({ "id": result.insertedId, "email": user.email });
@@ -29,6 +29,10 @@ class UsersController {
             console.error(err);
             res.status(500).json({ error: "Internal Server Error" });
         }
+    }
+
+    static async getMe(req: Request, res: Response): Promise<void> {
+
     }
 }
 
