@@ -54,8 +54,8 @@ class FilesController {
                 await fs.mkdir(FOLDER_PATH, { recursive: true })
                 const fileData = Buffer.from(data, 'base64')
                 await fs.writeFile(filePath, fileData)
-                
-                const file: File = { userId, name, isPublic, type, parentId, localPath: filePath}
+
+                const file: File = { userId, name, isPublic, type, parentId, localPath: filePath }
                 const result = await dbClient.fileCollection.insertOne(file)
                 res.status(201).json({ _id: result.insertedId, ...file })
                 return
@@ -64,6 +64,54 @@ class FilesController {
             }
         } catch (error) {
             res.status(500).json({ error: error });
+        }
+    }
+
+    static async getShow(req: Request, res: Response): Promise<void> {
+        try {
+            const { id } = req.params
+            const token = req.headers["x-token"]
+            const key = `auth_${token}`
+            const userId = await redisClient.get(key)
+            if (!userId) {
+                res.status(401).json({ error: "Unauthorised" })
+                return
+            }
+            const userFiles = await dbClient.fileCollection.find({ userId: new ObjectId(userId) })
+            if (!userFiles || userId === id) {
+                res.status(404).json({ error: "Not found" });
+                return
+            }
+            res.status(200).json(userFiles)
+        } catch (error) {
+            res.status(500).json({ error: error });
+        }
+    }
+
+    static async getIndex(req: Request, res: Response): Promise<void> {
+        try {
+            const { parentId, page = 0 } = req.query
+            const token = req.headers["x-token"]
+            const key = `auth_${token}`
+            const userId = await redisClient.get(key)
+            if (!userId) {
+                res.status(401).json({ error: "Unauthorised" })
+                return
+            }
+            const pageSize = 20
+            const files = await dbClient.fileCollection.aggregate([{
+                $match: {
+                    parentId: parentId
+                },
+                $facet: {
+                    metadata: [{ $count: 'totalCount' }],
+                    data: [{ $skip: Number(page) * pageSize }, { $limit: pageSize }]
+                }
+            }])
+            // console.log('files', files)
+            res.status(200).json(files)
+        } catch (error) {
+            res.status(500).json({ error: error })
         }
     }
 }
