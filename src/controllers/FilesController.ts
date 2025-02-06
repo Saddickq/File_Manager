@@ -125,6 +125,54 @@ class FilesController {
             res.status(500).json({ error: error })
         }
     }
+
+    static async putPublish(req: Request, res: Response): Promise<void> {
+        try {
+            const { id } = req.params
+            const token = req.headers["x-token"]
+            const key = `auth_${token}`
+            const userId = await redisClient.get(key)
+            if (!userId) {
+                res.status(401).json({ error: "Unauthorised" })
+                return
+            }
+            const file = await dbClient.fileCollection.updateOne(
+                { _id: new ObjectId(id), userId: userId },
+                { $set: { isPublic: true } }
+                )
+            if (!file) {
+                res.status(404).json({ error: "Not found" });
+                return
+            }
+            res.status(200).json(file)
+        } catch (error) {
+            res.status(500).json({ error: error });
+        }
+    }
+
+    static async putUnpublish(req: Request, res: Response): Promise<void> {
+        try {
+            const { id } = req.params
+            const token = req.headers["x-token"]
+            const key = `auth_${token}`
+            const userId = await redisClient.get(key)
+            if (!userId) {
+                res.status(401).json({ error: "Unauthorised" })
+                return
+            }
+            const file = await dbClient.fileCollection.updateOne(
+                { _id: new ObjectId(id), userId: userId },
+                { $set: { isPublic: false } }
+                )
+            if (!file) {
+                res.status(404).json({ error: "Not found" });
+                return
+            }
+            res.status(200).json(file)
+        } catch (error) {
+            res.status(500).json({ error: error });
+        }
+    }
 }
 
 export default FilesController
