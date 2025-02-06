@@ -6,6 +6,7 @@ file_path = sys.argv[1]
 file_name = file_path.split('/')[-1]
 
 file_encoded = None
+
 with open(file_path, "rb") as image_file:
     file_encoded = base64.b64encode(image_file.read()).decode('utf-8')
 

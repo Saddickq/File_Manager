@@ -77,12 +77,13 @@ class FilesController {
                 res.status(401).json({ error: "Unauthorised" })
                 return
             }
-            const userFiles = await dbClient.fileCollection.find({ userId: new ObjectId(userId) })
-            if (!userFiles || userId === id) {
+            const file = await dbClient.fileCollection.findOne({ _id: new ObjectId(id), userId: userId })
+
+            if (!file) {
                 res.status(404).json({ error: "Not found" });
                 return
             }
-            res.status(200).json(userFiles)
+            res.status(200).json(file)
         } catch (error) {
             res.status(500).json({ error: error });
         }
@@ -90,7 +91,7 @@ class FilesController {
 
     static async getIndex(req: Request, res: Response): Promise<void> {
         try {
-            const { parentId, page = 0 } = req.query
+            const { parentId = 0, page = 0 } = req.query
             const token = req.headers["x-token"]
             const key = `auth_${token}`
             const userId = await redisClient.get(key)
@@ -99,17 +100,27 @@ class FilesController {
                 return
             }
             const pageSize = 20
-            const files = await dbClient.fileCollection.aggregate([{
-                $match: {
-                    parentId: parentId
+            // const parsedParentId = parentId === "0" ? 0 : parentId;
+
+            const files = await dbClient.fileCollection.aggregate([
+                {
+                    $match: {
+                        userId: userId,
+                        // parentId: parentId
+                    }
                 },
-                $facet: {
-                    metadata: [{ $count: 'totalCount' }],
-                    data: [{ $skip: Number(page) * pageSize }, { $limit: pageSize }]
+                {
+                    $facet: {
+                        metadata: [{ $count: 'totalCount' }],
+                        data: [
+                            { $skip: Number(page) * pageSize },
+                            { $limit: pageSize }
+                        ]
+                    }
                 }
-            }])
-            // console.log('files', files)
-            res.status(200).json(files)
+            ]).toArray()
+
+            res.status(200).json(files[0].data)
         } catch (error) {
             res.status(500).json({ error: error })
         }
