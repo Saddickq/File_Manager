@@ -8,6 +8,8 @@ import { v4 as uuidv4 } from "uuid";
 import { FOLDER_PATH } from "../config";
 import { File } from "../utils/types";
 import mime from "mime-types"
+import fileQueue from "../utils/fileQueue"
+
 
 class FilesController {
     static async postUpload(req: Request, res: Response): Promise<void> {
@@ -49,6 +51,7 @@ class FilesController {
                 res.status(201).json({ _id: result.insertedId, ...folder })
                 return
             }
+
             const filename = uuidv4()
             const filePath = path.join(FOLDER_PATH, filename)
             try {
@@ -58,6 +61,11 @@ class FilesController {
 
                 const file: File = { userId, name, isPublic, type, parentId, localPath: filePath }
                 const result = await dbClient.fileCollection.insertOne(file)
+
+                if (file.type === 'image' && result.insertedId) {
+                    await fileQueue.add({ userId, fileId: result.insertedId })
+                }
+
                 res.status(201).json({ _id: result.insertedId, ...file })
                 return
             } catch (error) {
@@ -101,13 +109,13 @@ class FilesController {
                 return
             }
             const pageSize = 20
-            // const parsedParentId = parentId === "0" ? 0 : parentId;
+            const parsedParentId = parentId === "0" ? 0 : parentId;
 
             const files = await dbClient.fileCollection.aggregate([
                 {
                     $match: {
                         userId: userId,
-                        // parentId: parentId
+                        // parentId: parsedParentId
                     }
                 },
                 {
@@ -178,13 +186,11 @@ class FilesController {
     static async getFile(req: Request, res: Response): Promise<void> {
         try {
             const { id } = req.params
+            const { size } = req.query
             const token = req.headers["x-token"]
             const key = `auth_${token}`
             const userId = await redisClient.get(key)
-            // if (!userId) {
-            //     res.status(401).json({ error: "Unauthorised" })
-            //     return
-            // }
+
             const file = await dbClient.fileCollection.findOne({ _id: new ObjectId(id) })
             if (!file) {
                 res.status(404).json({error: "Not found"})
@@ -199,16 +205,22 @@ class FilesController {
                 return
             }
 
-            fs.access(file.localPath)
-                .then(async () => {
-                    const mimeType = mime.lookup(file.name) || "application/octet-stream"
-                    res.setHeader("Content-Type", mimeType)
-                    const fileBuffer = await fs.readFile(file.localPath)
-                    res.status(200).send(fileBuffer)
-                })
-                .catch(() => {
-                    res.status(404).json({error: "File not in local Storage"})
-                })
+            const sizeStr = Array.isArray(size) ? size[0] : size as string;
+            let filePath = file.localPath
+            if (typeof sizeStr === "string" && ["500", "250", "100"].includes(sizeStr)) {
+                filePath = `${file.localPath}_${size}`
+            }
+
+            fs.access(filePath)
+            .then(async () => {
+                const mimeType = mime.lookup(file.name) || "application/octet-stream"
+                res.setHeader("Content-Type", mimeType)
+                const fileBuffer = await fs.readFile(filePath)
+                res.status(200).send(fileBuffer)
+            })
+            .catch(() => {
+                res.status(404).json({error: "File not in local Storage"})
+            })
         } catch (error) {
             res.status(500).json({error: error})
         }
