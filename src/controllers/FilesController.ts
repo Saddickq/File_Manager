@@ -7,6 +7,7 @@ import path from "path";
 import { v4 as uuidv4 } from "uuid";
 import { FOLDER_PATH } from "../config";
 import { File } from "../utils/types";
+import mime from "mime-types"
 
 class FilesController {
     static async postUpload(req: Request, res: Response): Promise<void> {
@@ -171,6 +172,45 @@ class FilesController {
             res.status(200).json(file)
         } catch (error) {
             res.status(500).json({ error: error });
+        }
+    }
+
+    static async getFile(req: Request, res: Response): Promise<void> {
+        try {
+            const { id } = req.params
+            const token = req.headers["x-token"]
+            const key = `auth_${token}`
+            const userId = await redisClient.get(key)
+            // if (!userId) {
+            //     res.status(401).json({ error: "Unauthorised" })
+            //     return
+            // }
+            const file = await dbClient.fileCollection.findOne({ _id: new ObjectId(id) })
+            if (!file) {
+                res.status(404).json({error: "Not found"})
+                return
+            }
+            if (file.type === 'folder') {
+                res.status(400).json({error: "A folder doesn't have content"})
+                return
+            }
+            if (!file.isPublic && file.userId !== userId) {
+                res.status(404).json({error: "Not a public file or doesn't delong to you"})
+                return
+            }
+
+            fs.access(file.localPath)
+                .then(async () => {
+                    const mimeType = mime.lookup(file.name) || "application/octet-stream"
+                    res.setHeader("Content-Type", mimeType)
+                    const fileBuffer = await fs.readFile(file.localPath)
+                    res.status(200).send(fileBuffer)
+                })
+                .catch(() => {
+                    res.status(404).json({error: "File not in local Storage"})
+                })
+        } catch (error) {
+            res.status(500).json({error: error})
         }
     }
 }
