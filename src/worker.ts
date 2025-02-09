@@ -1,5 +1,5 @@
 import imageThumbnail from "image-thumbnail"
-import fileQueue from "./utils/fileQueue"
+import { userQueue, fileQueue } from "./utils/queues"
 import dbClient from "./utils/db"
 import { writeFile } from "fs/promises"
 import { ObjectId } from "mongodb"
@@ -23,6 +23,22 @@ fileQueue.process(async (job) => {
         await writeFile(`${file.localPath}_250`, thumbnail250)
         await writeFile(`${file.localPath}_100`, thumbnail100)
 
+        console.log("Thumbnails generated")
+    }
+    catch (error) {
+        throw error
+    }
+})
+
+userQueue.process(async (job) => {
+    const { userId } = job.data
+    try {
+        if (!userId) throw new Error('Missing userId')
+
+        const user = await dbClient.userCollection.findOne({ _id: new ObjectId(userId) })
+        if (!user) throw new Error('User not found')
+
+        console.log(`Welcome ${user.email}`)
     }
     catch (error) {
         throw error

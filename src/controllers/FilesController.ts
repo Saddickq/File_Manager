@@ -8,7 +8,7 @@ import { v4 as uuidv4 } from "uuid";
 import { FOLDER_PATH } from "../config";
 import { File } from "../utils/types";
 import mime from "mime-types"
-import fileQueue from "../utils/fileQueue"
+import { fileQueue } from "../utils/queues"
 
 
 class FilesController {
@@ -115,7 +115,7 @@ class FilesController {
                 {
                     $match: {
                         userId: userId,
-                        // parentId: parsedParentId
+                        parentId: parsedParentId
                     }
                 },
                 {
@@ -148,7 +148,7 @@ class FilesController {
             const file = await dbClient.fileCollection.updateOne(
                 { _id: new ObjectId(id), userId: userId },
                 { $set: { isPublic: true } }
-                )
+            )
             if (!file) {
                 res.status(404).json({ error: "Not found" });
                 return
@@ -172,7 +172,7 @@ class FilesController {
             const file = await dbClient.fileCollection.updateOne(
                 { _id: new ObjectId(id), userId: userId },
                 { $set: { isPublic: false } }
-                )
+            )
             if (!file) {
                 res.status(404).json({ error: "Not found" });
                 return
@@ -193,15 +193,15 @@ class FilesController {
 
             const file = await dbClient.fileCollection.findOne({ _id: new ObjectId(id) })
             if (!file) {
-                res.status(404).json({error: "Not found"})
+                res.status(404).json({ error: "Not found" })
                 return
             }
             if (file.type === 'folder') {
-                res.status(400).json({error: "A folder doesn't have content"})
+                res.status(400).json({ error: "A folder doesn't have content" })
                 return
             }
             if (!file.isPublic && file.userId !== userId) {
-                res.status(404).json({error: "Not a public file or doesn't delong to you"})
+                res.status(404).json({ error: "Not a public file or doesn't delong to you" })
                 return
             }
 
@@ -212,17 +212,17 @@ class FilesController {
             }
 
             fs.access(filePath)
-            .then(async () => {
-                const mimeType = mime.lookup(file.name) || "application/octet-stream"
-                res.setHeader("Content-Type", mimeType)
-                const fileBuffer = await fs.readFile(filePath)
-                res.status(200).send(fileBuffer)
-            })
-            .catch(() => {
-                res.status(404).json({error: "File not in local Storage"})
-            })
+                .then(async () => {
+                    const mimeType = mime.lookup(file.name) || "application/octet-stream"
+                    res.setHeader("Content-Type", mimeType)
+                    const fileBuffer = await fs.readFile(filePath)
+                    res.status(200).send(fileBuffer)
+                })
+                .catch(() => {
+                    res.status(404).json({ error: "File not in local Storage" })
+                })
         } catch (error) {
-            res.status(500).json({error: error})
+            res.status(500).json({ error: error })
         }
     }
 }

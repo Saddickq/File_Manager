@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs'
 import { User } from "../utils/types";
 import redisClient from "../utils/redis";
 import { ObjectId } from "mongodb";
+import { userQueue } from "../utils/queues"
 
 class UsersController {
     static async postNew(req: Request, res: Response): Promise<void> {
@@ -26,6 +27,11 @@ class UsersController {
         const user: User = { email: email, password: hashPassword }
         try {
             const result = await dbClient.userCollection.insertOne(user);
+
+            if (result.insertedId) {
+                await userQueue.add({ userId: result.insertedId })
+            }
+
             res.status(201).json({ "id": result.insertedId, "email": user.email });
         } catch (err) {
             console.error(err);
